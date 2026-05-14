@@ -195,8 +195,15 @@ jobs:
   publish:
     needs: [build, generate_release_notes]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_ref || 'master' }}
+
       - name: Sanitize release notes
         id: clean_notes
         env:
@@ -238,13 +245,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install F-Droid tooling
+        if: ${{ hashFiles('config.yml') != '' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y fdroidserver aapt apksigner
 
       - name: Update F-Droid repo contents
+        if: ${{ hashFiles('config.yml') != '' }}
         env:
-          APK_PATH: ${{ needs.build.outputs.apk_release_path }}
+          APK_PATH: downloaded/${{ needs.build.outputs.apk_release_path }}
           VERSION_NAME: ${{ needs.build.outputs.version_name }}
           VERSION_CODE: ${{ needs.build.outputs.version_code }}
         run: |
@@ -255,6 +264,7 @@ jobs:
           fdroid update --config config.yml --pretty
 
       - name: Publish F-Droid repo to GitHub Pages
+        if: ${{ hashFiles('config.yml') != '' }}
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -267,4 +277,3 @@ jobs:
       - name: Cleanup signing key
         if: always()
         run: rm -f presentation/my-release-key.keystore
-
